@@ -10,7 +10,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
         *{
-         margin: 0;
+            margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: "Poppins", sans-serif;
@@ -59,6 +59,9 @@
             box-shadow: -8px -8px 15px rgba(255, 255, 255, 0.1);
             cursor: pointer;
         }
+        button:active{
+            box-shadow: inset -4px -4px 8px rgba(255,255,255,0.15);
+        }
         .equalBtn{
             background-color: #fb7c14;
         }
@@ -67,69 +70,150 @@
         }
     </style>
     <div class="calculator">
-        <input type="text" placeholder="0" id="inputBox">
+        <input type="text" placeholder="0" id="inputBox" readonly>
         <div>
-            <button class="operator">AC</button>
-            <button class="operator">DEl</button>
-            <button class="operator">%</button>
-            <button class="operator">/</button>
+            <button class="operator" data-action="clear">AC</button>
+            <button class="operator" data-action="delete">DEL</button>
+            <button class="operator" data-value="%">%</button>
+            <button class="operator" data-value="/">/</button>
         </div>
         <div>
-            <button>7</button>
-            <button>8</button>
-            <button>9</button>
-            <button class="operator">*</button>
+            <button data-value="7">7</button>
+            <button data-value="8">8</button>
+            <button data-value="9">9</button>
+            <button class="operator" data-value="*">*</button>
         </div>
         <div>
-            <button>4</button>
-            <button>5</button>
-            <button>6</button>
-            <button class="operator">-</button>
+            <button data-value="4">4</button>
+            <button data-value="5">5</button>
+            <button data-value="6">6</button>
+            <button class="operator" data-value="-">-</button>
         </div>
         <div>
-            <button>1</button>
-            <button>2</button>
-            <button>3</button>
-            <button class="operator">+</button>
+            <button data-value="1">1</button>
+            <button data-value="2">2</button>
+            <button data-value="3">3</button>
+            <button class="operator" data-value="+">+</button>
         </div>
         <div>
-            <button>00</button>
-            <button>0</button>
-            <button>.</button>
-            <button class="equalBtn">=</button>
+            <button data-value="00">00</button>
+            <button data-value="0">0</button>
+            <button data-value=".">.</button>
+            <button class="equalBtn" data-action="equals">=</button>
         </div>
     </div>
 
     <script>
-        let input = document.getElementById('inputBox');
-        let buttons = document.querySelectorAll('button');
+        const input = document.getElementById('inputBox');
+        const buttons = document.querySelectorAll('button');
+        let expression = "";
 
-        let string = "";
-        let arr = Array.from(buttons);
-        arr.forEach(button => {
-        button.addEventListener('click', (e) =>{
-        if(e.target.innerHTML == '='){
-            string = eval(string);
-            input.value = string;
+        function updateDisplay(){
+            input.value = expression || "";
+            input.placeholder = "0";
         }
 
-        else if(e.target.innerHTML == 'AC'){
-            string = "";
-            input.value = string;
+        function isOperator(ch){
+            return ["+", "-", "*", "/", "%"].includes(ch);
         }
-        else if (e.target.innerHTML == 'DEl'){
-            string = string.substring(0, string.
-            length-1);
-            input.value = string;
 
+        function appendValue(val){
+         
+            if(isOperator(val) && isOperator(expression.slice(-1))){
+                expression = expression.slice(0, -1) + val;
+                updateDisplay();
+                return;
+            }
+            
+            if(isOperator(val) && expression === "" && val !== "-"){
+                return;
+            }
+            // only one decimal point per number segment
+            if(val === "."){
+                const lastNumber = expression.split(/[\+\-\*\/%]/).pop();
+                if(lastNumber.includes(".")) return;
+                if(lastNumber === "") val = "0.";
+            }
+            expression += val;
+            updateDisplay();
         }
-        else{string += e.target.innerHTML;
-            input.value = string;   
-        }
-        
-        })
-        })
 
+        function calculate(){
+            if(expression === "") return;
+            try{
+                // replace % with JS modulo-safe division for percentage use
+                let safeExpr = expression.replace(/%/g, "/100");
+                if(/[\+\-\*\/]$/.test(safeExpr)){
+                    safeExpr = safeExpr.slice(0, -1);
+                }
+                
+                let result = Function('"use strict"; return (' + safeExpr + ')')();
+                if(result === undefined || Number.isNaN(result) || !Number.isFinite(result)){
+                    expression = "Error";
+                } else {
+                    result = Math.round(result * 1e10) / 1e10;
+                    expression = String(result);
+                }
+            } catch(err){
+                expression = "Error";
+            }
+            updateDisplay();
+        }
+
+        function clearAll(){
+            expression = "";
+            updateDisplay();
+        }
+
+        function deleteLast(){
+            if(expression === "Error"){
+                expression = "";
+            } else {
+                expression = expression.slice(0, -1);
+            }
+            updateDisplay();
+        }
+
+        buttons.forEach(button => {
+            button.addEventListener('click', () => {
+                const action = button.dataset.action;
+                const value = button.dataset.value;
+                if(action === "clear") clearAll();
+                else if(action === "delete") deleteLast();
+                else if(action === "equals") calculate();
+                else if(value !== undefined) appendValue(value);
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key;
+
+            if((key >= '0' && key <= '9')){
+                appendValue(key);
+                e.preventDefault();
+                return;
+            }
+            if(['+','-','*','/','%','.'].includes(key)){
+                appendValue(key);
+                e.preventDefault();
+                return;
+            }
+            if(key === 'Enter' || key === '='){
+                calculate();
+                e.preventDefault();
+                return;
+            }
+            if(key === 'Backspace'){
+                deleteLast();
+                e.preventDefault();
+                return;
+            }
+            if(key === 'Escape'){
+                clearAll();
+                e.preventDefault();
+                return;
+            }
+        });
     </script>
 </body>
 </html>
